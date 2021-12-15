@@ -56,10 +56,10 @@ public class Bank {
 
     public void changeAmount(long accId, double amount) throws TransactionsException {
         var acc = getAccount(accId);
+        if (isAccountBlocked(accId)){
+            throw new TransactionsException("account blocked");
+        }
         synchronized (acc){
-            if (isAccountBlocked(accId)){
-                throw new TransactionsException("account blocked");
-            }
             double amountAcc = acc.getAmount();
             if (amount < 0 && amountAcc < Math.abs(amount)){
                 throw new TransactionsException("insufficient funds");
@@ -71,11 +71,11 @@ public class Bank {
     public void transferMoney(long srcAccId, long dstAccId, double amount) throws TransactionsException {
         var acc1 = getAccount(srcAccId);
         var acc2 = getAccount(dstAccId);
+        if (isAccountBlocked(srcAccId) || isAccountBlocked(dstAccId)){
+            throw new TransactionsException("account blocked");
+        }
         synchronized (acc1){
             synchronized (acc2){
-                if (isAccountBlocked(srcAccId) || isAccountBlocked(dstAccId)){
-                    throw new TransactionsException("account blocked");
-                }
                 acc1.setBlocked(true);
                 acc2.setBlocked(true);
                 if (acc1.getAmount() < amount){
