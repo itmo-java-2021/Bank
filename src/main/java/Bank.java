@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static java.lang.Thread.sleep;
+
 public class Bank {
-    private long count;
-    private ConcurrentHashMap<Long, Account> accMap;
+    private volatile long count;
+    private final ConcurrentHashMap<Long, Account> accMap;
     private final List<Thread> transferTask;
 
     public Bank() {
@@ -21,93 +23,80 @@ public class Bank {
         return account;
     }
 
-    public double getAmount(long accId) throws Exception {
-        if (accMap.containsKey(accId)){
+    public double getAmount(long accId) throws TransactionsException {
+        var acc = getAccount(accId);
+        synchronized (acc){
             if (isAccountBlocked(accId)){
-                throw new Exception("account blocked");
+                throw new TransactionsException("account blocked");
             }
             return accMap.get(accId).getAmount();
         }
-        throw new Exception("no id found");
     }
 
-    public void blockAccount(long accId){
-        if (accMap.containsKey(accId)){
-            accMap.get(accId).setBlocked(true);
+    public void blockAccount(long accId) throws TransactionsException {
+        var acc = getAccount(accId);
+        synchronized (acc){
+            acc.setBlocked(true);
         }
     }
 
-    public void unblockAccount(long accId){
-        if (accMap.containsKey(accId)){
-            accMap.get(accId).setBlocked(false);
+    public void unblockAccount(long accId) throws TransactionsException {
+        var acc = getAccount(accId);
+        synchronized (acc){
+            acc.setBlocked(false);
         }
     }
 
-    public boolean isAccountBlocked(long accId) throws Exception {
-        if (accMap.containsKey(accId)){
+    public boolean isAccountBlocked(long accId) throws TransactionsException {
+        var acc = getAccount(accId);
+        synchronized (acc){
             return accMap.get(accId).isBlocked();
         }
-        throw new Exception("no id found");
     }
 
-    public void changeAmount(long accId, double amount) throws Exception {
-        if (accMap.containsKey(accId)){
+    public void changeAmount(long accId, double amount) throws TransactionsException {
+        var acc = getAccount(accId);
+        synchronized (acc){
             if (isAccountBlocked(accId)){
-                throw new Exception("");
+                throw new TransactionsException("account blocked");
             }
-            Account account = accMap.get(accId);
-            account.setAmount(account.getAmount() + amount);
+            double amountAcc = acc.getAmount();
+            if (amount < 0 && amountAcc < Math.abs(amount)){
+                throw new TransactionsException("insufficient funds");
+            }
+            acc.setAmount(acc.getAmount() + amount);
         }
     }
 
-    public void transferMoney(long srcAccId, long dstAccId, double amount) throws Exception {
-        if (isAccountBlocked(srcAccId) || isAccountBlocked(dstAccId)){
-            throw new Exception("account blocked");
-        }
-        if (accMap.containsKey(srcAccId) && accMap.containsKey(dstAccId)){
-            Transfer transfer = new Transfer(srcAccId, dstAccId, amount);
-            transferTask.add(transfer);
-            transfer.start();
-        } else {
-            throw new Exception("no id found");
+    public void transferMoney(long srcAccId, long dstAccId, double amount) throws TransactionsException {
+        var acc1 = getAccount(srcAccId);
+        var acc2 = getAccount(dstAccId);
+        synchronized (acc1){
+            synchronized (acc2){
+                if (isAccountBlocked(srcAccId) || isAccountBlocked(dstAccId)){
+                    throw new TransactionsException("account blocked");
+                }
+                acc1.setBlocked(true);
+                acc2.setBlocked(true);
+                if (acc1.getAmount() < amount){
+                    throw new TransactionsException("insufficient funds");
+                }
+                acc1.setAmount(acc1.getAmount() - amount);
+                acc2.setAmount(acc2.getAmount() + amount);
+                acc1.setBlocked(false);
+                acc2.setBlocked(false);
+            }
         }
     }
 
-    private long nextId(){
+    private synchronized long nextId(){
         return ++count;
     }
 
-    public List<Thread> getTransferTask() {
-        return new ArrayList<>(transferTask);
-    }
-
-    class Transfer extends Thread implements Closeable{
-        private long srcAccId;
-        private long dstAccId;
-        private double amount;
-
-        public Transfer(long srcAccId, long dstAccId, double amount) {
-            this.srcAccId = srcAccId;
-            this.dstAccId = dstAccId;
-            this.amount = amount;
+    private synchronized Account getAccount(long id) throws TransactionsException {
+        if (accMap.containsKey(id)){
+            return accMap.get(id);
         }
-
-        @Override
-        public void run() {
-            Account acc1 = accMap.get(srcAccId);
-            Account acc2 = accMap.get(dstAccId);
-            acc1.setBlocked(true);
-            acc2.setBlocked(true);
-            if (acc1.getAmount() >= amount){
-                acc1.setAmount(acc1.getAmount() - amount);
-                acc2.setAmount(acc2.getAmount() + amount);
-            }acc1.setBlocked(false);
-            acc2.setBlocked(false);
-        }
-
-        public void close() {
-            interrupt();
-            transferTask.remove(this);
-        }
+        throw new TransactionsException("no id found");
     }
 }
