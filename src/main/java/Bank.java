@@ -24,11 +24,11 @@ public class Bank {
     public double getAmount(long accId) throws Exception {
         if (accMap.containsKey(accId)){
             if (isAccountBlocked(accId)){
-                throw new Exception("");
+                throw new Exception("account blocked");
             }
             return accMap.get(accId).getAmount();
         }
-        return 0;
+        throw new Exception("no id found");
     }
 
     public void blockAccount(long accId){
@@ -43,11 +43,11 @@ public class Bank {
         }
     }
 
-    public boolean isAccountBlocked(long accId){
+    public boolean isAccountBlocked(long accId) throws Exception {
         if (accMap.containsKey(accId)){
             return accMap.get(accId).isBlocked();
         }
-        return false;
+        throw new Exception("no id found");
     }
 
     public void changeAmount(long accId, double amount) throws Exception {
@@ -62,11 +62,15 @@ public class Bank {
 
     public void transferMoney(long srcAccId, long dstAccId, double amount) throws Exception {
         if (isAccountBlocked(srcAccId) || isAccountBlocked(dstAccId)){
-            throw new Exception("");
+            throw new Exception("account blocked");
         }
-        Transfer transfer = new Transfer(srcAccId, dstAccId, amount);
-        transferTask.add(transfer);
-        transfer.start();
+        if (accMap.containsKey(srcAccId) && accMap.containsKey(dstAccId)){
+            Transfer transfer = new Transfer(srcAccId, dstAccId, amount);
+            transferTask.add(transfer);
+            transfer.start();
+        } else {
+            throw new Exception("no id found");
+        }
     }
 
     private long nextId(){
