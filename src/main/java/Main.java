@@ -17,7 +17,7 @@ public class Main {
             Thread thread = new Thread(() -> {
                 try {
                     var acc = bank.createAccount(finalI);
-                    acc.setAmount(new Random().nextDouble(3000));
+                    acc.setAmount(3000);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -25,6 +25,10 @@ public class Main {
             list.add(thread);
             thread.start();
         }
+        for (Thread thread: list){
+            thread.join();
+        }
+        list.clear();
 
         //проверка блокировки
         Thread thread1 = new Thread(() -> {
@@ -48,14 +52,22 @@ public class Main {
         });
         list.add(thread2);
         thread2.start();
+        for (Thread thread: list){
+            thread.join();
+        }
+        list.clear();
 
         //проверка снятие больше чем есть на счету
         try{
-            bank.changeAmount(1, -4000);
+            bank.changeAmount(3, -4000);
         }
         catch (Exception e){
             e.printStackTrace();
         }
+        for (Thread thread: list){
+            thread.join();
+        }
+        list.clear();
 
         //проверка transfer
         Thread thread3 = new Thread(() -> {
@@ -77,10 +89,9 @@ public class Main {
         list.add(thread4);
         thread4.start();
 
-
-
         for (Thread thread: list){
             thread.join();
         }
+        list.clear();
     }
 }
